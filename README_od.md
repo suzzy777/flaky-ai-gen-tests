@@ -435,8 +435,24 @@ flaky_analysis_tool_od.sh
                     candidate OD test
 ```
 
-## Optional
+## Optional: iDFlakies
 
-After the custom-Surefire random-order version works, iDFlakies can also be run inside the same ReproFlake Docker environment as an alternative detector:
+iDFlakies can also be tried inside the **same ReproFlake Docker container** after ChatUniTest generates and adds the new test.
+
+For minimal changes, do not create another script. In `flaky_analysis_tool_od.sh`, after the ChatUniTest step, either:
+
+```text
+call modified od_statistics_generator.sh
+    -> our ~100 custom-Surefire orders
+```
+
+or:
+
+```text
+run iDFlakies
+    -> iDFlakies performs the OD detection
+```
+
+This lets both approaches use the same ReproFlake project, Docker environment, and ChatUniTest-generated test.
 
 https://github.com/UT-SE-Research/iDFlakies
