@@ -55,24 +55,4 @@ ChatUniTest's prompt tells the model it may use reflection, but says nothing abo
 * **The check:** I added an `@After` that puts the original object back, in copies of the 3 files.
 * **The result:** all 35 developer test methods pass again.
 
-## 5. Other things we found
-
-* **Two ormlite generated test methods (one per side) make broken developer test methods pass:**
-  3 methods of `LoggerTest` (1 on the flaky side, 2 on the non-flaky side). `LoggerTest` fails on its own; the generated tests happen to switch logging on, so it then passes. This is not
-  the generated tests' fault.
-* **One developer test method is a timing flake, not pollution.** elastic-job `JobEventRdbSearchTest#assertFindJobStatusTraceEventsWithTime` failed
-  after many different tests. A 5 ms sleep made the failures disappear.
-* **iDFlakies needs confirming.** It gave about 2,850 suspects (developer test methods that might
-  depend on a generated test); real runs confirmed only the cases above.
-* **We fixed a bug in our own script.** It mixed up iDFlakies' passing and failing orders, and missed
-  24 of the 35 broken developer test methods until it was fixed.
-
-## 6. Running now
-
-* **Prompt experiment:** we generate tests again for the 3 focal methods behind the polluting files
-  (plus 2 JUnit 5 focal methods), 3 times each,
-  with the current prompt and with a prompt that adds "restore anything you change in @After".
-* **Question:** does the new prompt stop the pollution?
-* **Results:** expected around 13:00-13:30.
-
 **Details:** `OD_RESULTS.md` (full analysis), `RESULTS_TABLE.md` (all counts).
