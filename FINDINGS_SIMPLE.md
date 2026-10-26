@@ -27,19 +27,23 @@
 | | Flaky side | Non-flaky side |
 |---|---|---|
 | Generated test files that break developer tests | **3 of 23 (13%)** | **0 of 94 (0%)** |
+| Generated test methods that break developer tests (confirmed by runs) | 5 of 48 (10%) | 0 of 175 (0%) |
 | Focal methods those files were generated for | 3 of 22 (14%) | 0 of 93 (0%) |
 | Developer test methods they break | **35** | 0 |
+
+The 3 bad files contain 10 generated test methods. The breaking code is in each file's `@Before`, which runs
+before every method, so all 10 do it. The runs named 5 of them because they stop at the first one they find.
 
 Fisher's exact test (two-sided) on the generated test files, 3 of 23 (13%) vs 0 of 94 (0%): p = 0.007.
 
 The 3 generated test files:
 
-| Generated test file | Developer test methods it breaks |
-|---|---|
-| dubbo `ChangeTelnetHandler_telnet_0_1_Test` | 12 |
-| dubbo `PortTelnetHandler_telnet_0_0_Test` | 12 |
-| marineapi `AISMessageFactory_create_0_3_Test` | 11 |
-| **Total** | **35** |
+| Generated test file | Generated test methods in it | Developer test methods it breaks |
+|---|---|---|
+| dubbo `ChangeTelnetHandler_telnet_0_1_Test` | 5 | 12 |
+| dubbo `PortTelnetHandler_telnet_0_0_Test` | 4 | 12 |
+| marineapi `AISMessageFactory_create_0_3_Test` | 1 | 11 |
+| **Total** | **10** | **35** |
 
 ## 3. Why
 
