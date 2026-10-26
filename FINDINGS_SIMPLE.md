@@ -20,17 +20,17 @@
 
 | | Flaky side | Non-flaky side |
 |---|---|---|
-| Generated test methods that are flaky on their own (rerun, NonDex, NIO, iDFlakies) | 0 of 48 | 0 of 175 |
+| Generated test methods that are flaky on their own (rerun, NonDex, NIO, iDFlakies) | 0 of 48 (0%) | 0 of 175 (0%) |
 
 ## 2. But some generated tests break the developers' own tests
 
 | | Flaky side | Non-flaky side |
 |---|---|---|
-| Generated test files that break developer tests | **3 of 23** | **0 of 94** |
-| Focal methods those files were generated for | 3 of 22 | 0 of 93 |
+| Generated test files that break developer tests | **3 of 23 (13%)** | **0 of 94 (0%)** |
+| Focal methods those files were generated for | 3 of 22 (14%) | 0 of 93 (0%) |
 | Developer test methods they break | **35** | 0 |
 
-Fisher's exact test (two-sided) on the generated test files, 3 of 23 vs 0 of 94: p = 0.007.
+Fisher's exact test (two-sided) on the generated test files, 3 of 23 (13%) vs 0 of 94 (0%): p = 0.007.
 
 The 3 generated test files:
 
