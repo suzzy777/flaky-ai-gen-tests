@@ -16,7 +16,7 @@ ChatUniTest (gpt-4o) and an LLM agent generate unit tests for focal methods of r
 3. **One root cause covers every polluter.** The test replaces a static singleton or static field with a mock or an empty object, often by reflection, and never restores it. None has an `@After`. Adding an `@After` that restores the field fixed 35 of 35 victims.
 4. **A prompt that asks for cleanup removes it.** Current prompt: 4 of 8 files are polluters, breaking 507 developer tests. Cleanup prompt: 0 of 12 (Fisher p = 0.014).
 5. **Most of the broken developer tests are new.** Of the 507 broken by the current prompt, 418 are not in IDoFT's list of known flaky tests.
-6. **An agent that reads the existing tests first pollutes less, but copies their weaknesses.** Agent A (no reading): 2 marineapi polluters. Agent F (reads tests first): 0 polluters, but its 3 marineapi files become victims of an existing developer polluter, because F copied the setup of a test that's already a known victim.
+6. **An agent that reads the existing tests first pollutes less, but copies their weaknesses.** Agent A (no reading): 6 of 13 files are polluters (dubbo ×4, marineapi ×2). Agent F (reads tests first): 3 of 11 (dubbo only, p = 0.42), and its 3 marineapi files become victims of an existing developer polluter, because F copied the setup of a test that's already a known victim.
 7. **Quality:** for the same focal method, the generated tests usually match the developer tests on coverage and mutation score. When they differ, the developer tests are more often better. Line coverage is 86% vs 94% (Wilcoxon p = 0.004). Generated tests on the flaky side are much weaker: line 66%, mutation 39%.
 
 ## The reflection issue, in short
@@ -31,7 +31,7 @@ f.set(null, mockProtocol);  // replace the shared singleton with a mock
 
 **Why it matters here:**
 - ChatUniTest's own prompt tells the model to "use reflection to invoke private methods or fields if needed". So the generated tests often swap a shared singleton or static field for a mock or an empty object, and never put it back.
-- That leftover state breaks the developer tests that run later, which covers 8 of the 10 polluter files.
+- That leftover state breaks the developer tests that run later, which covers 14 of the 16 polluter files.
 - The cleanup prompt still allows reflection, but asks for an `@After` that restores the field.
 
 ## Research questions and results so far
@@ -48,8 +48,8 @@ f.set(null, mockProtocol);  // replace the shared singleton with a mock
 | Main, non-flaky side | ChatUniTest, focal methods of non-flaky tests | 156 focal methods, 13 modules | 141 | 132 | 94 | 78 | 0 | 1 | 0 | 0 | 0 | 0 | - |
 | Prompt, current | ChatUniTest's own prompt, 5 focal methods ×3 | 15 runs, 5 modules | 15 | 13 | 8 | 8 | **4** | 2 | 0 | 0 | 0 | **507** | 70 |
 | Prompt, cleanup | + "restore shared state" | 15 runs, 5 modules | 15 | 15 | 12 | 12 | 0 | 1 | 0 | 0 | 0 | 0 | - |
-| Agent A | agent, doesn't read existing tests | 15 runs, 5 modules | 15 | 15 | 13 | 8 (dubbo running) | **2** | 3 | 0 | 0 | 0 | **11** | 11 |
-| Agent F | agent, reads existing tests first | 15 runs, 5 modules | 15 | 14 | 11 | 6 (dubbo, scimono on machine B) | 0 | 3 | **3** | 0 | 0 | 0 | - |
+| Agent A | agent, doesn't read existing tests | 15 runs, 5 modules | 15 | 15 | 13 | 13 | **6** | 3 | 0 | 0 | 0 | **41** | 15 |
+| Agent F | agent, reads existing tests first | 15 runs, 5 modules | 15 | 14 | 11 | 11 | **3** | 3 | **3** | 0 | 0 | **27** | 4 |
 
 **What the columns mean:**
 - **Tests generated:** the generator produced a test file.
@@ -61,8 +61,9 @@ f.set(null, mockProtocol);  // replace the shared singleton with a mock
 - **B, brittle:** the generated file fails alone and passes after another test. None; files that fail alone are excluded anyway.
 - **Developer tests broken:** distinct developer tests that fail after a polluter.
 - **...known OD tests in IDoFT:** of those, how many IDoFT's `pr-data.csv` already lists as order-dependent (`OD-Vic`).
-  - Some more are listed under other categories: main study 12 (NDOD/NOD), prompt current 19 (ID/NDOD/NOD).
-  - The rest are new: main study 12 of 35, prompt current 418 of 507, agent A 0 of 11.
+  - Some more are listed under other categories: main study 12 (NDOD/NOD), prompt current 19 (ID/NDOD/NOD), agent A 12, agent F 11.
+  - The rest are new: main study 12 of 35, prompt current 418 of 507, agent A 14 of 41, agent F 12 of 27.
+- **Agents, pass-alone rule:** as for ChatUniTest, only files that pass alone count. Agent A row 5 (dubbo, a polluter) fails alone in 2 of its 6 methods, so it is not counted.
 
 **Modules per experiment** (module = one project at one commit, as a ReproFlake archive):
 
@@ -72,8 +73,8 @@ f.set(null, mockProtocol);  // replace the shared singleton with a mock
 | Main, non-flaky side | the 13 modules where the flaky side generated tests | 13 | 12 | 12 | 11 | 8 | 0 |
 | Prompt, current | 5 focal methods chosen from the main study (2): dubbo ×2, marineapi, ormlite, scimono | 5 | 5 | 5 | 4 (no marineapi) | 4 | 3 (dubbo ×2, ormlite) |
 | Prompt, cleanup | same 5 | 5 | 5 | 5 | 5 | 5 | 0 |
-| Agent A | same 5 | 5 | 5 | 5 | 5 | 3 (dubbo running) | 1 (marineapi) |
-| Agent F | same 5 | 5 | 5 | 5 | 5 | 2 (dubbo, scimono on machine B) | 0 |
+| Agent A | same 5 | 5 | 5 | 5 | 5 | 5 | 3 (dubbo ×2, marineapi) |
+| Agent F | same 5 | 5 | 5 | 5 | 5 | 5 | 2 (dubbo ×2) |
 
 (2) **How the 5 were chosen:**
 - From the flaky side, the 3 confirmed polluters: dubbo aa9f16e `ChangeTelnetHandler#telnet`, dubbo 628ad77 `PortTelnetHandler#telnet`, marineapi `AISMessageFactory#create`.
@@ -86,7 +87,7 @@ f.set(null, mockProtocol);  // replace the shared singleton with a mock
 - 27 → 15: no generated file passes alone.
 - 15 → 11: iDFlakies can't run (mixed JUnit 4/5, its runner crashed, a JVM didn't exit).
 
-**In short:** across all experiments, 9 generated files are polluters. They break 35 + 507 + 11 developer tests, and most of those weren't known as order-dependent before. The main-study difference, 3 of 18 vs 0 of 78 polluter files, is significant (Fisher p = 0.006).
+**In short:** across all experiments, 16 generated files are polluters. They break 35 + 507 + 41 + 27 developer tests, and most of those weren't known as order-dependent before. The main-study difference, 3 of 18 vs 0 of 78 polluter files, is significant (Fisher p = 0.006).
 
 ### RQ1.1. How does the context available to the generator affect flakiness? (reworded)
 
@@ -94,8 +95,8 @@ ChatUniTest is a fixed pipeline that sees only the focal class. Agent A explores
 
 | | ChatUniTest (current prompt) | Agent A | Agent F |
 |---|---|---|---|
-| Polluter files | 4 of 8 (2 of 3 without dubbo) | 2 of 8 (dubbo pending) | 0 of 6 (dubbo, scimono pending) |
-| Generated victim files | 0 | 0 | 3 of 6 (all marineapi) |
+| Polluter files | 4 of 8 (2 of 3 without dubbo) | 6 of 13 (2 of 8 without dubbo) | 3 of 11 (0 of 7 without dubbo) |
+| Generated victim files | 0 | 0 | 3 of 11 (all marineapi) |
 | Files with an `@After` that has code | 0% | 0% | 36% |
 | marineapi focal-method line coverage | 0% (main-study file; the current-prompt files fail alone) | 18% | 82% |
 
@@ -113,14 +114,14 @@ ChatUniTest is a fixed pipeline that sees only the focal class. Agent A explores
 
 | Flakiness category (ReproFlake) | Developer flaky tests we started from (53 used, of 144) | Generated tests |
 |---|---|---|
-| **OD**, order-dependent (polluter / victim) | 23 | **all of it**: 9 polluter files, 3 victim files |
+| **OD**, order-dependent (polluter / victim) | 23 | **all of it**: 16 polluter files, 3 victim files |
 | **ID**, implementation-dependent (e.g. HashMap order; found by NonDex) | 17 | 0 (NonDex, 100 seeds) |
 | **TD**, time-dependent | 9 | 0 (no sleep or clock use in any generated file) |
 | **NIO**, not idempotent (fails when run twice in a row) | 4 | 0 (NIO, 100 runs) |
 
 **One mechanism behind all the generated cases:**
 - A shared singleton or static field is replaced with a mock or an empty object, and never restored. None of the polluters has an `@After`.
-- In 8 of the 10 polluter files this is done by reflection; in the other 2 (ormlite), by the class's own static setter.
+- In 14 of the 16 polluter files this is done by reflection; in the other 2 (ormlite), by the class's own static setter.
 
 **Why the generated tests differ** (static counts):
 - They are small and mock-heavy: about 2 test methods per file; 66–100% of files use mocks, against 29% of the developer classes.
@@ -146,7 +147,7 @@ ChatUniTest is a fixed pipeline that sees only the focal class. Agent A explores
 
 - **The mechanism is confirmed:** adding a restoring `@After` by hand to the main study's 3 polluters made all 35 of their victims pass.
 - **Cost:** coverage stayed the same, except ormlite (100% → 67%).
-- **Agent variant:** telling the agent to read the existing tests first (F) also brought polluters to 0. But it copied an existing weakness: 3 victim files (RQ1.1).
+- **Agent variant:** telling the agent to read the existing tests first (F) brought polluters down (A 6 of 13, F 3 of 11, all dubbo), not to 0. And it copied an existing weakness: 3 victim files (RQ1.1).
 - **Caveat:** 5 focal methods with 3 runs each, so treat this as case evidence.
 
 ## 1. Main study: ChatUniTest on ReproFlake
@@ -218,14 +219,14 @@ Fisher, 4/8 vs 0/12: **p = 0.014**.
 
 | Subject | A | F |
 |---|---|---|
-| dubbo ×2 (rows 1-6) | 5 of 6 generated files pass. iDFlakies flags rows 1-4 as polluters; **confirmation is still running** (done tonight or tomorrow). | 4 pass; row 3 made no tests. **Running on machine B** (about 1 day). |
+| dubbo ×2 (rows 1-6) | 5 of 6 files pass (row 5 fails alone). **4 polluters** (rows 1-4; 30 developer tests). | 4 pass (row 6 fails alone; row 3 made no tests). **3 polluters** (rows 2, 4, 5; 27 developer tests). Rows 1 and 3 read the existing tests and are clean. |
 | marineapi (rows 7-9) | **2 polluters** (11 developer tests each, all known in IDoFT). Row 9 breaks the same 11 but fails alone, so it's left out. | **0 polluters**, but **all 3 files are victims** of a developer polluter. F copied the singleton setup of a developer test that's an IDoFT known victim. |
 | ormlite (rows 10-12) | 0 polluters; 3 harmless state-setters | 0 polluters; 3 harmless state-setters, and its `@AfterEach` restores the state |
-| scimono (rows 13-15) | clean | machine B |
+| scimono (rows 13-15) | clean | clean (rows 13-14 fail alone) |
 | Flaky alone (rerun / NonDex / NIO) | 0 | 0 |
 | Cost (15 rows) | $3.88 | $3.85 |
 
-**Takeaway:** reading the existing tests transfers their patterns, the bad ones as well as the good ones. Sample is small (A vs F polluters 2 of 8 vs 0 of 6, p = 0.47).
+**Takeaway:** reading the existing tests transfers their patterns, the bad ones as well as the good ones. Sample is small (A vs F polluters 6 of 13 vs 3 of 11, p = 0.42).
 
 ## 5. Test quality: coverage and mutation of the focal method
 
@@ -281,8 +282,8 @@ Mutation here is STRONGER. Dubbo is still pending.
 | ChatUniTest main, non-flaky side | 94 | 0 of 78 checked | 66% | 43% | 0% | 1.9 | 75 |
 | Prompt, current | 8 | 4 | 100% | 62% | 0% | 2.9 | 59 |
 | Prompt, cleanup | 12 | 0 | 75% | 100% | **92%** | 2.1 | 61 |
-| Agent A | 13 | 2 (dubbo pending) | 77% | 85% | 0% | 2.8 | 50 |
-| Agent F | 11 | 0 (dubbo pending) | 45% | 55% | 36% | 3.5 | 51 |
+| Agent A | 13 | 6 | 77% | 85% | 0% | 2.8 | 50 |
+| Agent F | 11 | 3 | 45% | 55% | 36% | 3.5 | 51 |
 
 - **The pattern:** generated tests mock a lot and write fields by reflection; developer tests never do. They almost never clean up, except with the cleanup prompt or agent F.
 - The developer row combines the flaky and non-flaky sides, weighted by file count.
@@ -290,9 +291,8 @@ Mutation here is STRONGER. Dubbo is still pending.
 
 ## 7. Still running or open
 
-- **Agent A dubbo:** iDFlakies is on row 5 of 6 on this machine. Then confirmation, re-check and the other 3 checks follow.
-- **Agent F dubbo and scimono:** running on machine B, about 1 day.
-- **Dubbo coverage and mutation** (main study and the 5-subject set): runs after the agent dubbo check (port clash).
+- **Agent A and F dubbo, F scimono:** done (in the tables above).
+- **Dubbo coverage and mutation** (main study and the 5-subject set): done, not yet in section 5.
 - **Caveats:**
   - small samples in the prompt and agent experiments (5 focal methods);
   - one LLM (gpt-4o);
