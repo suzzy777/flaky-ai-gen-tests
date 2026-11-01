@@ -46,14 +46,18 @@ All 300 come from 80 project archives (44 projects). The non-flaky focal methods
 6. **TD check, FlakeSync** (Hana): ran on every file that passes alone except hadoop, because FlakeSync's default blacklist excludes `org.apache.hadoop` from instrumentation. **Stress test** (Devanshi, stress-ng CPU/memory): ran on the main study and rows 1-15, hadoop included.
 
 ## RQ1: How often are generated tests flaky?
-- **Flaky alone:** none. No generated test method is flaky when run alone, in any experiment (main study: 0 of 240 methods).
-  | Check | What it does | Methods checked | Flaky |
-  |---|---|---|---|
-  | 100 reruns | run each method alone 100 times | all that pass alone | 0 |
-  | NonDex | shuffle unordered Java APIs (100 seeds) | all that pass alone | 0 |
-  | NIO | run each method twice in one JVM, 100 times | all that pass alone | 0 |
-  | Stress (stress-ng) | each method alone 10x under full CPU load and 10x under memory pressure | 421 (main study + rows 1-15) | 0 |
-  | TD (FlakeSync) | find methods that run concurrently, then delay them (100 ms up to 12.8 s) | 510 (all experiments, no hadoop) | 0 (concurrency found in only 1 method, a dubbo agent test; no delay makes it fail) |
+- **All flakiness checks, one per type:**
+
+  | Check | Flakiness type | What it does | Checked | Result |
+  |---|---|---|---|---|
+  | 100 reruns | non-deterministic (NOD) | run each method alone 100 times | all methods that pass alone | 0 flaky |
+  | NonDex | implementation-dependent (ID) | shuffle unordered Java APIs (100 seeds) | all methods that pass alone | 0 flaky |
+  | NIO | non-idempotent (NIO) | run each method twice in one JVM, 100 times | all methods that pass alone | 0 flaky |
+  | FlakeSync | timing / concurrency (TD) | find methods that run concurrently, then delay them (100 ms up to 12.8 s) | 510 methods (all experiments, no hadoop) | 0 flaky (concurrency found in only 1 method, a dubbo agent test; no delay makes it fail) |
+  | Stress (stress-ng) | resource-dependent | each method alone 10x under full CPU load and 10x under memory pressure | 421 methods (main study + rows 1-15) | 0 flaky |
+  | iDFlakies + confirmation | order-dependent (OD) | 20 random orders of the whole module test suite with the generated file, then confirm each case in a fixed order | 228 files (main study 96, rows 1-15: 65, rows 16-30: 67) | **17 polluter files, 21 state-setter files, 7 victim files** (iDFlakies finds 4 of the 7 victims; all 7 by direct check after the known developer polluter) |
+
+- **Flaky alone:** so no generated test method is flaky by itself (main study: 0 of 240 methods). All the flakiness is order-dependence.
 - **Polluters:** generated tests often break developer tests.
   - Main study (ChatUniTest; 126 files pass alone, 96 of them checkable by iDFlakies): **3 of 96 files are polluters**, and **10 of the 240 test methods in the 126 files pollute** (each method run alone before a victim, twice). Together they break 35 developer tests.
   - Across all experiments: **17 polluter files, from just 4 focal methods**; **54 of the 67 test methods in these files pollute** (in 12 files every method does). They break **over 500 developer tests**, 478 of them through one ormlite log setting. Most of these tests weren't known as flaky.
