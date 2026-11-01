@@ -50,6 +50,8 @@ f.set(null, mockProtocol);  // replace the shared singleton with a mock
 | Prompt, cleanup | + "restore shared state" | 15 runs, 5 modules | 15 | 15 | 12 | 12 | 0 | 1 | 0 | 0 | 0 | 0 | - |
 | Agent A | agent, doesn't read existing tests | 15 runs, 5 modules | 15 | 15 | 13 | 13 | **6** | 3 | 0 | 0 | 0 | **41** | 15 |
 | Agent F | agent, reads existing tests first | 15 runs, 5 modules | 15 | 14 | 11 | 11 | **3** | 3 | **3** | 0 | 0 | **27** | 4 |
+| Agent FC | F + cleanup sentence | 15 runs, 5 modules | 15 | 15 | 12 | 12 | **1** | 3 | **2** | 0 | 0 | **14** | - |
+| Agent FCV | FC + "don't assume default state" | 15 runs, 5 modules | 15 | 15 | 9 | 9 | 0 | 3 | **2** | 0 | 0 | 0 | - |
 
 **What the columns mean:**
 - **Tests generated:** the generator produced a test file.
@@ -57,7 +59,7 @@ f.set(null, mockProtocol);  // replace the shared singleton with a mock
 - **OD-checked:** iDFlakies ran 20 rounds and `od_confirm` confirmed what it flagged. On the main study, iDFlakies couldn't run on 5 + 16 files (mixed JUnit 4/5, its runner crashed, a JVM didn't exit).
 - **P, polluter:** the generated file makes developer tests fail.
 - **S, state-setter:** the generated file makes a brittle developer test pass. It's harmless; all are in ormlite.
-- **V, victim:** the generated file itself fails after a developer test. Only agent F's 3 marineapi files.
+- **V, victim:** the generated file itself fails after a developer test. Only marineapi files: F 3, FC 2, FCV 2 (FC/FCV by direct check, 2026-10-31).
 - **B, brittle:** the generated file fails alone and passes after another test. None; files that fail alone are excluded anyway.
 - **Developer tests broken:** distinct developer tests that fail after a polluter.
 - **...known OD tests in IDoFT:** of those, how many IDoFT's `pr-data.csv` already lists as order-dependent (`OD-Vic`).
@@ -99,6 +101,8 @@ ChatUniTest is a fixed pipeline that sees only the focal class. Agent A explores
 | Generated victim files | 0 | 0 | 3 of 11 (all marineapi) |
 | Files with an `@After` that has code | 0% | 0% | 36% |
 | marineapi focal-method line coverage | 0% (main-study file; the current-prompt files fail alone) | 18% | 82% |
+
+**FC and FCV (added 2026-10-31):** polluters FC 1 of 12 (dubbo row 2, its `@After` resets only its mock), FCV 0 of 9; victims FC 2 of 2 and FCV 2 of 2 marineapi files. Matched (focal methods where all four conditions have a usable file): A 3/10, F 2/9, FC 0/11, FCV 0/9.
 
 **Did they actually read the tests?** Both agents have the same tools (shell, so they can read any file).
 - **A read 0 existing test files in all 15 runs.**
@@ -148,6 +152,7 @@ ChatUniTest is a fixed pipeline that sees only the focal class. Agent A explores
 - **The mechanism is confirmed:** adding a restoring `@After` by hand to the main study's 3 polluters made all 35 of their victims pass.
 - **Cost:** coverage stayed the same, except ormlite (100% → 67%).
 - **Agent variant:** telling the agent to read the existing tests first (F) brought polluters down (A 6 of 13, F 3 of 11, all dubbo), not to 0. And it copied an existing weakness: 3 victim files (RQ1.1).
+- **Agent + cleanup (FC):** polluters 1 of 12 (runs: A 6, F 3, FC 1 of 15). **FC + victim sentence (FCV):** 0 polluters, but its 3 runs on dubbo `ChangeTelnetHandler` (where FC polluted) are all unusable, so 0 is not evidence; victims unchanged (2 of 2). See section 8.
 - **Caveat:** 5 focal methods with 3 runs each, so treat this as case evidence.
 
 ## 1. Main study: ChatUniTest on ReproFlake
@@ -228,6 +233,8 @@ Fisher, 4/8 vs 0/12: **p = 0.014**.
 
 **Takeaway:** reading the existing tests transfers their patterns, the bad ones as well as the good ones. Sample is small (A vs F polluters 6 of 13 vs 3 of 11, p = 0.42).
 
+- **FC** = F + the cleanup sentence; **FCV** = FC + "don't assume shared state is in its default state; set it up in @Before". Results in section 8.
+
 ## 5. Test quality: coverage and mutation of the focal method
 
 **How it's measured:**
@@ -292,11 +299,32 @@ Mutation here is STRONGER. Dubbo is still pending.
 ## 7. Still running or open
 
 - **Agent A and F dubbo, F scimono:** done (in the tables above).
+- **FC, FCV, the 10 focal methods (rows 16-30), coverage/mutation and cost:** done (section 8, 2026-10-31).
 - **Dubbo coverage and mutation** (main study and the 5-subject set): done, not yet in section 5.
 - **Caveats:**
   - small samples in the prompt and agent experiments (5 focal methods);
   - one LLM (gpt-4o);
   - 23 of 47 flaky-side files pass, so the polluter rate is computed on the files that pass.
+
+## 8. Added 2026-10-31: FC, FCV, the 10 focal methods, cost
+
+**Outcome of every run, rows 1-15** (15 runs each; unusable = no file or a file failing every rerun; victims by direct check):
+
+| | Polluter | Victim | Clean | Unusable |
+|---|---|---|---|---|
+| ChatUniTest current | 4 | 0 | 4 | 7 |
+| ChatUniTest cleanup | 0 | 0 | 12 | 3 |
+| Agent A | 6 | 0 | 7 | 2 |
+| Agent F | 3 | 3 | 5 | 4 |
+| Agent FC | 1 | 2 | 9 | 3 |
+| Agent FCV | 0 | 2 | 7 | 6 |
+
+- **Victims (marineapi):** every usable agent file that read the tests fails right after the developer polluter `SentenceFactoryTest#testRegisterParserWithAlternativeBeginChar` (F 3/3, FC 2/2, FCV 2/2; A 0/2). iDFlakies found only 4 of these 7: `SentenceFactoryTest`'s `@Before` resets the factory, so another method of that class usually cleans up in between. The FCV sentence had no effect.
+- **Instructions make generation harder:** agent runs that hit the 40-step limit, rows 1-30: A 4, F 5, FC 7, FCV 8 of 30. FC/FCV on dubbo `ChangeTelnetHandler`: 5 of 6 runs looped on `getDeclaredField("exporterMap")` (the field is in the parent class `AbstractProtocol`).
+- **Rows 16-30 (5 new focal methods, 6 conditions):** 0 polluters, 0 victims everywhere. Pass alone: current 12, cleanup 9, A 12, F 12, FC 10, FCV 12 of 15. 13 agent files broken (12 from step-limit runs). One "polluter" (FCV row 17) was a timing-flaky developer test, `JobEventRdbSearchTest` (`new10_checks/TIMING_FLAKY_DEV_TESTS.md`).
+- **FCI (marineapi only, not in tables):** FC + IDoFT's 12 known OD tests named in the prompt. 1 of 3 runs usable, and that one is not a victim (it mocks its input instead of using the singleton); 2 runs hit the step limit.
+- **Coverage/mutation, rows 1-15 (STRONGER, focal method):** mutation F 90%, FC 86%, FCV 88%, A 78%, current 68%, cleanup 59%, developer 72%. Class level: developer 88% lines vs 39-58% generated (`quality/class_level.csv`). `SchemaUtils#createSchema` rescored on the asked-for overload (`quality/createschema_selected.csv`).
+- **Cost per run (rows 1-30):** ChatUniTest <= $0.10; A $0.26, F $0.26, FC $0.46, FCV $0.47 (`cost_table.csv`).
 
 ## Where the data is
 
