@@ -49,26 +49,27 @@ All 300 come from 80 project archives (44 projects). The non-flaky focal methods
 
 Same for all: gpt-4o (`gpt-4o-2024-08-06`), temperature 0.5. The agent is mini-swe-agent with a 40-step and $3 limit per run.
 
-| Experiment | Generator | What changes in the prompt / context |
+Each condition adds text to the one before it. The exact text that is added (for JUnit 5 tests, `@Before`/`@After` read `@BeforeEach`/`@AfterEach`):
+
+| Experiment | Generator | Exact text added to the prompt |
 |---|---|---|
-| Main study | ChatUniTest | its own default prompt; one file per developer test (144 flaky + 156 non-flaky) |
-| Prompt, default | ChatUniTest | its own default prompt |
-| Prompt, cleanup | ChatUniTest | default + the **cleanup sentence** (see below) |
-| Agent A | agent | ChatUniTest's first prompt + "how to work" steps (test file path, Maven command, fix until it passes); it can explore the project but isn't told to read the tests |
-| Agent F | agent | A + "read the project's existing tests first (in `src/test/java`); your test will be added next to them" |
-| Agent FC | agent | F + the **cleanup sentence** |
-| Agent FCV | agent | FC + the **victim sentence** (see below) |
+| Main study, Prompt default | ChatUniTest | nothing: ChatUniTest's own prompt (it already says: "Compile without errors, and use reflection to invoke private methods.") |
+| Prompt cleanup | ChatUniTest | **System message:** "The tests may run in any order together with the project's other tests in the same JVM, so they must not change state that other tests see: if a test changes a static field, a singleton (e.g. an object returned by getInstance()), a system property, or any field set by reflection, save the original value before changing it (in @Before) and restore it in an @After method." <br> **Repair step:** "If the test changes a static field, a singleton or a field set by reflection, save the original value and restore it in an @After method." |
+| Agent A | agent | ChatUniTest's first prompt, then: "You are in the project's repository: <path> (JDK <n>, Maven offline). Every bash command runs in a new shell starting in that directory. You can read any file of the project (e.g. with cat, sed -n, grep) to find what you need." <br> "1. Write the JUnit test class `<Class>` (package `<pkg>`) to <path>. Do not change any other file of the project. 2. Compile and run it with: <mvn command>. Run only your own test class. 3. Fix it until it compiles and its tests pass. 4. Then finish by running `echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT` as its own command." |
+| Agent F | agent | A + a new first step: "1. Read the project's existing tests first. They are in <src/test/java>; read the ones you need. Your test class will be added to the project's test suite next to them." <br> + in the "Write the test class" step: "Text in your reply is not saved: write the test file with a bash command (e.g. `cat > <path> << 'EOF'`)." |
+| Agent FC | agent | F + the same two **cleanup** sentences as Prompt cleanup (the first in the system message, the second in the "Fix it until it compiles and its tests pass" step) |
+| Agent FCV | agent | FC + **victim sentence** in the system message: "Each test must pass no matter which tests ran before it: do not assume that shared state (static fields, singletons, system properties) is in its default state; set up the state your test needs in @Before." |
 
 **The two extra sentences, in plain words:**
 
 | | Cleanup sentence | Victim sentence |
 |---|---|---|
 | Protects against | the generated test being a **polluter**: it changes shared state and leaves it changed, so *later* tests fail | the generated test being a **victim**: it fails because an *earlier* test left shared state changed |
-| What it asks | "Clean up after yourself": if you change a static field, a singleton (e.g. from `getInstance()`), a system property or a field set by reflection, save the old value in `@Before` and put it back in `@After` | "Don't trust what others left behind": don't assume shared state is in its default state; set up the state your test needs yourself in `@Before` |
+| What it asks (our short summary, not the prompt's words) | Clean up after yourself: if you change a static field, a singleton (e.g. from `getInstance()`), a system property or a field set by reflection, save the old value in `@Before` and put it back in `@After` | Don't trust what others left behind: don't assume shared state is in its default state; set up the state your test needs yourself in `@Before` |
 | Used in | Prompt cleanup, Agent FC, Agent FCV | Agent FCV only |
 | Did it work? | yes: polluters 4 of 8 -> 0 of 12 files (ChatUniTest), 3 -> 1 run (agent F -> FC) | no: the marine-api victims stay (FCV 2 of 2 usable files) |
 
-Exact wording in the prompt:
+Exact wording in the prompt (the whole sentence that is added, nothing else):
 - **Cleanup:** "The tests may run in any order together with the project's other tests in the same JVM, so they must not change state that other tests see: if a test changes a static field, a singleton (e.g. an object returned by getInstance()), a system property, or any field set by reflection, save the original value before changing it (in @Before) and restore it in an @After method."
 - **Victim:** "Each test must pass no matter which tests ran before it: do not assume that shared state (static fields, singletons, system properties) is in its default state; set up the state your test needs in @Before."
 
