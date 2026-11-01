@@ -3,11 +3,11 @@
 Numbers as they stand in the paper now (paper/sections/results.tex).
 
 ## RQ1: How often are generated tests flaky?
-- **Flaky alone:** none. No generated test is flaky when run alone (100 reruns, NonDex, NIO), in any experiment.
+- **Flaky alone:** none. No generated test method is flaky when run alone (100 reruns, NonDex, NIO), in any experiment (main study: 0 of 223 methods).
 - **Polluters:** generated tests often break developer tests.
-  - Main study (ChatUniTest; 117 files pass alone, 96 of them checkable by iDFlakies): **3 of 96 files are polluters**. Together they break 35 developer tests.
-  - Across all experiments: **17 polluter files, from just 4 focal methods**. They break **over 500 developer tests**, 478 of them through one ormlite log setting. Most of these tests weren't known as flaky.
-- **State-setters:** 21 files, all harmless. They make one brittle developer test (`LoggerTest`) pass.
+  - Main study (ChatUniTest; 117 files pass alone, 96 of them checkable by iDFlakies): **3 of 96 files are polluters**, and **10 of the 223 test methods in the 117 files pollute** (each method run alone before a victim, twice). Together they break 35 developer tests.
+  - Across all experiments: **17 polluter files, from just 4 focal methods**; **54 of the 67 test methods in these files pollute** (in 12 files every method does). They break **over 500 developer tests**, 478 of them through one ormlite log setting. Most of these tests weren't known as flaky.
+- **State-setters:** 21 files, all harmless (main study: 2 files, 3 methods). They make one brittle developer test (`LoggerTest`) pass.
 
 ## RQ2: Why does it happen?
 - **What polluters do:** every polluter replaces a shared static field or singleton with a mock or empty object, and never puts it back.
