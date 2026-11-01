@@ -4,19 +4,22 @@ Numbers as they stand in the paper now (paper/sections/results.tex).
 
 ## Main study: filtering steps (paper/sections/setup.tex)
 
-**Project archives** (one module of a project at one commit):
+**Focal methods and generated files** (flaky and non-flaky sources together):
 
-| Step | Flaky side | Non-flaky side |
-|---|---|---|
-| Start | 80 (44 projects) | 13 |
-| Focal method identified | 32 | 13 |
-| Builds | 32 | 12 |
-| ChatUniTest generates at least one test | 28 | 12 |
-| At least one file passes alone | 15 | 11 |
-| iDFlakies can check | 11 | 8 |
-| With a polluter | 3 | 0 |
+| Step | Count |
+|---|---|
+| Start | 300 (144 flaky tests from ReproFlake + 156 sampled focal methods of non-flaky tests) |
+| Focal method identified | 209 |
+| Builds | 194 |
+| ChatUniTest generates a file | 180 |
+| Generated file passes alone | 117 (223 test methods) |
+| iDFlakies can check | 96 |
+| Polluter | 3 |
+| State-setter | 2 |
 
-**Flaky tests by type** (from the generation step on, one generated file per flaky test):
+All 300 come from 80 project archives (44 projects). The non-flaky focal methods are sampled from the 13 modules where a file for a flaky test passes alone (up to 15 per module, fixed seed), so they add no new projects.
+
+**Flaky tests by type** (types exist only for the flaky tests):
 
 | Step | OD | ID | TD | NIO | Total |
 |---|---|---|---|---|---|
@@ -29,11 +32,9 @@ Numbers as they stand in the paper now (paper/sections/results.tex).
 | Polluter | 3 | 0 | 0 | 0 | 3 |
 | State-setter | 1 | 0 | 0 | 0 | 1 |
 
-**Non-flaky side** (focal methods of non-flaky developer tests, sampled from the 13 modules where the flaky side has a file that passes alone; up to 15 per module, fixed seed): 156 focal methods → 141 build → 132 generated files → 94 pass alone → 78 iDFlakies can check.
-
 **Why tests drop out at each step:**
 1. **Focal method:** both techniques (Jaccard name similarity and the LLM) must pick the same single method. This removes tests of a whole component (e.g. wildfly's subsystem test), tests of a framework mechanism that call no production method directly (junit-quickcheck), and tests whose name points to no method (fastjson `Issue1480#test_for_issue`). 80 → 32 archives. NIO and TD tests drop most here.
-2. **Build:** all flaky-side archives build. graylog2-server builds once its JavaScript frontend build is skipped (the Java tests don't need it).
+2. **Build:** 15 focal methods drop out because their module (one of the 13) doesn't build (209 → 194). graylog2-server builds once its JavaScript frontend build is skipped (the Java tests don't need it).
 3. **Generation:** ChatUniTest keeps no test for 5 flaky tests. For graylog2-server, the time limit was raised from 30 minutes to 3 hours, because just parsing the project takes over an hour. When the focal method has overloads, only tests for the overload that the developer test calls are kept.
 4. **Pass alone:** the file must compile and pass alone; 13 archives have no such file. Example: the graylog test reads private fields by reflection, which graylog's own build check forbids in tests.
 5. **iDFlakies:** it can't run on 4 archives (mixed JUnit 4 and 5, its runner crashes, or a test JVM doesn't exit).
