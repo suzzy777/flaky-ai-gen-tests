@@ -45,6 +45,55 @@ All 300 come from 80 project archives (44 projects). The non-flaky focal methods
 5. **iDFlakies:** it can't run on 4 archives (mixed JUnit 4 and 5, its runner crashes, or a test JVM doesn't exit). One of them is hadoop: every iDFlakies round runs the whole YARN services suite with mini clusters and hit the 6 h limit with 0 of 20 rounds. So the hadoop files (1 flaky side, 9 non-flaky side) are checked with reruns, NonDex, NIO and the stress test, but not for order-dependence.
 6. **TD check, FlakeSync** (Hana): ran on every file that passes alone except hadoop, because FlakeSync's default blacklist excludes `org.apache.hadoop` from instrumentation. **Stress test** (Devanshi, stress-ng CPU/memory): ran on the main study and rows 1-15, hadoop included.
 
+## The experiments and what changes between them
+
+Same for all: gpt-4o (`gpt-4o-2024-08-06`), temperature 0.5. The agent is mini-swe-agent with a 40-step and $3 limit per run.
+
+| Experiment | Generator | What changes in the prompt / context |
+|---|---|---|
+| Main study | ChatUniTest | its own default prompt; one file per developer test (144 flaky + 156 non-flaky) |
+| Prompt, default | ChatUniTest | its own default prompt |
+| Prompt, cleanup | ChatUniTest | default + the **cleanup sentence** (see below) |
+| Agent A | agent | ChatUniTest's first prompt + "how to work" steps (test file path, Maven command, fix until it passes); it can explore the project but isn't told to read the tests |
+| Agent F | agent | A + "read the project's existing tests first (in `src/test/java`); your test will be added next to them" |
+| Agent FC | agent | F + the **cleanup sentence** |
+| Agent FCV | agent | FC + the **victim sentence** (see below) |
+
+**The two extra sentences, in plain words:**
+
+| | Cleanup sentence | Victim sentence |
+|---|---|---|
+| Protects against | the generated test being a **polluter**: it changes shared state and leaves it changed, so *later* tests fail | the generated test being a **victim**: it fails because an *earlier* test left shared state changed |
+| What it asks | "Clean up after yourself": if you change a static field, a singleton (e.g. from `getInstance()`), a system property or a field set by reflection, save the old value in `@Before` and put it back in `@After` | "Don't trust what others left behind": don't assume shared state is in its default state; set up the state your test needs yourself in `@Before` |
+| Used in | Prompt cleanup, Agent FC, Agent FCV | Agent FCV only |
+| Did it work? | yes: polluters 4 of 8 -> 0 of 12 files (ChatUniTest), 3 -> 1 run (agent F -> FC) | no: the marine-api victims stay (FCV 2 of 2 usable files) |
+
+Exact wording in the prompt:
+- **Cleanup:** "The tests may run in any order together with the project's other tests in the same JVM, so they must not change state that other tests see: if a test changes a static field, a singleton (e.g. an object returned by getInstance()), a system property, or any field set by reflection, save the original value before changing it (in @Before) and restore it in an @After method."
+- **Victim:** "Each test must pass no matter which tests ran before it: do not assume that shared state (static fields, singletons, system properties) is in its default state; set up the state your test needs in @Before."
+
+The prompt and agent experiments use 10 focal methods, 3 runs each: rows 1-15 (the 3 focal methods whose main-study tests are polluters + 2 that write fields by reflection) and rows 16-30 (5 more chosen where flakiness is likely).
+
+**Results per experiment** (files; P = polluter, S = state-setter, V = victim):
+
+| Experiment | Generated | Pass alone | OD-checked | P | S | V | Developer tests broken (not in IDoFT) |
+|---|---|---|---|---|---|---|---|
+| Main study (flaky + non-flaky sources) | 192 | 126 | 96 | **3** | 2 | 0 | 35 (12) |
+| Rows 1-15, ChatUniTest default | 13 | 8 | 8 | **4** | 2 | 0 | 507 (418) |
+| Rows 1-15, ChatUniTest cleanup | 15 | 12 | 12 | 0 | 1 | 0 | 0 |
+| Rows 1-15, Agent A | 15 | 13 | 13 | **6** | 3 | 0 | 41 (14) |
+| Rows 1-15, Agent F | 14 | 11 | 11 | **3** | 3 | 3 | 27 (12) |
+| Rows 1-15, Agent FC | 15 | 12 | 12 | **1** | 3 | 2 | 14 |
+| Rows 1-15, Agent FCV | 15 | 9 | 9 | 0 | 3 | 2 | 0 |
+| Rows 16-30, ChatUniTest default | 14 | 12 | 12 | 0 | 1 | 0 | 0 |
+| Rows 16-30, ChatUniTest cleanup | 15 | 9 | 9 | 0 | 1 | 0 | 0 |
+| Rows 16-30, Agent A | 14 | 12 | 12 | 0 | 2 | 0 | 0 |
+| Rows 16-30, Agent F | 15 | 12 | 12 | 0 | 0 | 0 | 0 |
+| Rows 16-30, Agent FC | 15 | 10 | 10 | 0 | 0 | 0 | 0 |
+| Rows 16-30, Agent FCV | 15 | 12 | 12 | 0 | 0 | 0 | 0 |
+
+No file is flaky alone in any row (reruns, NonDex and NIO everywhere; stress on the main study and rows 1-15; FlakeSync everywhere except hadoop). P, S and V add up to the totals in RQ1: 17 polluters, 21 state-setters, 7 victims.
+
 ## RQ1: How often are generated tests flaky?
 - **All flakiness checks, one per type:**
 
