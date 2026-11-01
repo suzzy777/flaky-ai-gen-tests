@@ -5,7 +5,7 @@ Numbers as they stand in the paper now (paper/sections/results.tex).
 ## RQ1: How often are generated tests flaky?
 - **Flaky alone:** none. No generated test is flaky when run alone (100 reruns, NonDex, NIO), in any experiment.
 - **Polluters:** generated tests often break developer tests.
-  - Main study: **3 of 18 files are polluters on the flaky side, vs 0 of 78 on the non-flaky side** (p = 0.006). Together they break 35 developer tests.
+  - Main study (ChatUniTest; 117 files pass alone, 96 of them checkable by iDFlakies): **3 of 96 files are polluters**. Together they break 35 developer tests.
   - Across all experiments: **17 polluter files, from just 4 focal methods**. They break **over 500 developer tests**, 478 of them through one ormlite log setting. Most of these tests weren't known as flaky.
 - **State-setters:** 21 files, all harmless. They make one brittle developer test (`LoggerTest`) pass.
 
