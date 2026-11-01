@@ -44,7 +44,7 @@ f.set(null, mockProtocol);  // replace the shared singleton with a mock
 
 | Experiment | What it is | Started with | Built | Tests generated | Pass alone (files) | OD-checked so far (files) | P | S | V | B | Flaky alone (rerun / NonDex / NIO) | Developer tests broken | ...known OD tests in IDoFT |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| Main, flaky side | ChatUniTest, focal methods of flaky tests | 144 flaky tests → 53 focal methods, 32 modules | 51 | 47 | 23 | 18 | **3** | 1 | 0 | 0 | 0 | **35** | 11 |
+| Main, flaky side | ChatUniTest, focal methods of flaky tests | 144 flaky tests → 53 focal methods, 32 modules | 53 | 48 | 23 | 18 | **3** | 1 | 0 | 0 | 0 | **35** | 11 |
 | Main, non-flaky side | ChatUniTest, focal methods of non-flaky tests | 156 focal methods, 13 modules | 141 | 132 | 94 | 78 | 0 | 1 | 0 | 0 | 0 | 0 | - |
 | Prompt, current | ChatUniTest's own prompt, 5 focal methods ×3 | 15 runs, 5 modules | 15 | 13 | 8 | 8 | **4** | 2 | 0 | 0 | 0 | **507** | 70 |
 | Prompt, cleanup | + "restore shared state" | 15 runs, 5 modules | 15 | 15 | 12 | 12 | 0 | 1 | 0 | 0 | 0 | 0 | - |
@@ -71,7 +71,7 @@ f.set(null, mockProtocol);  // replace the shared singleton with a mock
 
 | Experiment | Started with | Focal method found | Built | ≥1 test generated | ≥1 file passes alone | OD-checked | With a polluter |
 |---|---|---|---|---|---|---|---|
-| Main, flaky side | 80 modules (44 projects, 144 flaky tests) | 32 | 30 | 27 | 15 | 11 | 3 (dubbo ×2, marineapi) |
+| Main, flaky side | 80 modules (44 projects, 144 flaky tests) | 32 | 32 | 28 | 15 | 11 | 3 (dubbo ×2, marineapi) |
 | Main, non-flaky side | the 13 modules where the flaky side generated tests | 13 | 12 | 12 | 11 | 8 | 0 |
 | Prompt, current | 5 focal methods chosen from the main study (2): dubbo ×2, marineapi, ormlite, scimono | 5 | 5 | 5 | 4 (no marineapi) | 4 | 3 (dubbo ×2, ormlite) |
 | Prompt, cleanup | same 5 | 5 | 5 | 5 | 5 | 5 | 0 |
@@ -84,9 +84,9 @@ f.set(null, mockProtocol);  // replace the shared singleton with a mock
 
 **Where modules drop out:**
 - 80 → 32: no single focal method could be identified for the flaky test.
-- 32 → 30: graylog2-server (2 commits) doesn't build.
-- 30 → 27: ChatUniTest kept no test.
-- 27 → 15: no generated file passes alone.
+- 32 → 32: all build. graylog2-server (2 commits) builds once its JavaScript frontend build is skipped (`-Dskip.web.build=true`; the Java tests don't need it). Earlier we said it doesn't build.
+- 32 → 28: ChatUniTest kept no test (graylog ViewSharingResource is one of these).
+- 28 → 15: no generated file passes alone (graylog LookupCacheKey is one of these).
 - 15 → 11: iDFlakies can't run (mixed JUnit 4/5, its runner crashed, a JVM didn't exit).
 
 **In short:** across all experiments, 16 generated files are polluters. They break 35 + 507 + 41 + 27 developer tests, and most of those weren't known as order-dependent before. The main-study difference, 3 of 18 vs 0 of 78 polluter files, is significant (Fisher p = 0.006).
@@ -160,7 +160,7 @@ ChatUniTest is a fixed pipeline that sees only the focal class. Agent A explores
 **Generation (flaky side):**
 - 144 flaky tests;
 - 53 had a focal method identified;
-- 47 generated files;
+- 48 generated files;
 - **23 pass with plain `mvn test`** (48 methods).
 
 **Non-flaky side:** focal methods of non-flaky developer tests, **94 files** (175 methods).
@@ -171,7 +171,8 @@ ChatUniTest is a fixed pipeline that sees only the focal class. Agent A explores
 | Files iDFlakies could check (1) | 18 | 78 | |
 | Files with a real **polluter** | **3 of 18 (17%)** | **0 of 78** | p = 0.006 |
 | Files with a polluter or state-setter | 4 of 18 (22%) | 1 of 78 (1%) | p = 0.004 |
-| Generated methods that pollute or set state | 6/48 (12.5%) | 1/175 (0.6%) | p = 0.0004 |
+| Generated methods that pollute | 10/48 (21%) | 0/175 | p < 0.0000001 |
+| Generated methods that pollute or set state | 11/48 (23%) | 2/175 (1%) | p < 0.000001 |
 | Developer tests broken | **35** (23 in IDoFT, 12 new) | 0 | |
 | Generated tests that are themselves OD | 0 | 0 | |
 
@@ -304,7 +305,7 @@ Mutation here is STRONGER. Dubbo is still pending.
 - **Caveats:**
   - small samples in the prompt and agent experiments (5 focal methods);
   - one LLM (gpt-4o);
-  - 23 of 47 flaky-side files pass, so the polluter rate is computed on the files that pass.
+  - 23 of 48 flaky-side files pass, so the polluter rate is computed on the files that pass.
 
 ## 8. Added 2026-10-31: FC, FCV, the 10 focal methods, cost
 
@@ -324,6 +325,13 @@ Mutation here is STRONGER. Dubbo is still pending.
 - **Rows 16-30 (5 new focal methods, 6 conditions):** 0 polluters, 0 victims everywhere. Pass alone: current 12, cleanup 9, A 12, F 12, FC 10, FCV 12 of 15. 13 agent files broken (12 from step-limit runs). One "polluter" (FCV row 17) was a timing-flaky developer test, `JobEventRdbSearchTest` (`new10_checks/TIMING_FLAKY_DEV_TESTS.md`).
 - **FCI (marineapi only, not in tables):** FC + IDoFT's 12 known OD tests named in the prompt. 1 of 3 runs usable, and that one is not a victim (it mocks its input instead of using the singleton); 2 runs hit the step limit.
 - **Coverage/mutation, rows 1-15 (STRONGER, focal method):** mutation F 90%, FC 86%, FCV 88%, A 78%, current 68%, cleanup 59%, developer 72%. Class level: developer 88% lines vs 39-58% generated (`quality/class_level.csv`). `SchemaUtils#createSchema` rescored on the asked-for overload (`quality/createschema_selected.csv`).
+- **Polluter methods (pairwise check, 2026-11-01):** each method of every polluter file run alone before one of its victims, twice. **54 of the 67 methods in the 17 polluter files pollute** (od_confirm's halving had named only 28, because it stops at the first one). 12 files: every method pollutes (state replaced in `@Before`, or a 1-method file). 5 files: only the methods that set the mock (dubbo current row 2: 2/6, A row 1: 2/6, A row 2: 2/5; ormlite current rows 11, 12: 1/2). Per condition: main 10/10, current 8/14, A 17/24, F 15/15, FC 4/4. The main-study table above uses these exact counts (`pairwise_check/`).
+- **graylog2-server rerun (2026-11-01):** the 2 graylog archives, run again.
+  - The build works once the JavaScript frontend build is skipped.
+  - ChatUniTest needs about 70 minutes per archive just to parse the project, so the time limit was raised from 30 minutes to 3 hours.
+  - `ViewSharingResource#summarizeUsers`: no test kept (5 attempts × 5 repair rounds, all still with errors).
+  - `LookupCacheKey#createFromJSON`: 1 file, which fails alone. It reads private fields with `setAccessible`, and graylog's own build check (forbiddenapis) forbids that in tests, so the build fails.
+  - Result: 48 generated files instead of 47; pass alone, polluters and p-values unchanged. Files in `graylog_rerun/`.
 - **Cost per run (rows 1-30):** ChatUniTest <= $0.10; A $0.26, F $0.26, FC $0.46, FCV $0.47 (`cost_table.csv`).
 
 ## Where the data is
