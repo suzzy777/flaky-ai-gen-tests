@@ -43,10 +43,17 @@ All 300 come from 80 project archives (44 projects). The non-flaky focal methods
 3. **Generation:** ChatUniTest keeps no test for 5 flaky tests. For graylog2-server, the time limit was raised from 30 minutes to 3 hours, because just parsing the project takes over an hour. When the focal method has overloads, only tests for the overload that the developer test calls are kept.
 4. **Pass alone:** the file must compile and pass alone; 13 archives have no such file. Example: the graylog test reads private fields by reflection, which graylog's own build check forbids in tests.
 5. **iDFlakies:** it can't run on 4 archives (mixed JUnit 4 and 5, its runner crashes, or a test JVM doesn't exit). One of them is hadoop: every iDFlakies round runs the whole YARN services suite with mini clusters and hit the 6 h limit with 0 of 20 rounds. So the hadoop files (1 flaky side, 9 non-flaky side) are checked with reruns, NonDex, NIO and the stress test, but not for order-dependence.
-6. **FlakeSync** (Hana): ran on every file that passes alone except hadoop, because FlakeSync's default blacklist excludes `org.apache.hadoop` from instrumentation. **Stress test** (Devanshi, stress-ng CPU/memory): ran on all files, hadoop included; 0 flaky.
+6. **TD check, FlakeSync** (Hana): ran on every file that passes alone except hadoop, because FlakeSync's default blacklist excludes `org.apache.hadoop` from instrumentation. **Stress test** (Devanshi, stress-ng CPU/memory): ran on the main study and rows 1-15, hadoop included.
 
 ## RQ1: How often are generated tests flaky?
-- **Flaky alone:** none. No generated test method is flaky when run alone (100 reruns, NonDex, NIO), in any experiment (main study: 0 of 240 methods).
+- **Flaky alone:** none. No generated test method is flaky when run alone, in any experiment (main study: 0 of 240 methods).
+  | Check | What it does | Methods checked | Flaky |
+  |---|---|---|---|
+  | 100 reruns | run each method alone 100 times | all that pass alone | 0 |
+  | NonDex | shuffle unordered Java APIs (100 seeds) | all that pass alone | 0 |
+  | NIO | run each method twice in one JVM, 100 times | all that pass alone | 0 |
+  | Stress (stress-ng) | each method alone 10x under full CPU load and 10x under memory pressure | 421 (main study + rows 1-15) | 0 |
+  | TD (FlakeSync) | find methods that run concurrently, then delay them (100 ms up to 12.8 s) | 510 (all experiments, no hadoop) | 0 (concurrency found in only 1 method, a dubbo agent test; no delay makes it fail) |
 - **Polluters:** generated tests often break developer tests.
   - Main study (ChatUniTest; 126 files pass alone, 96 of them checkable by iDFlakies): **3 of 96 files are polluters**, and **10 of the 240 test methods in the 126 files pollute** (each method run alone before a victim, twice). Together they break 35 developer tests.
   - Across all experiments: **17 polluter files, from just 4 focal methods**; **54 of the 67 test methods in these files pollute** (in 12 files every method does). They break **over 500 developer tests**, 478 of them through one ormlite log setting. Most of these tests weren't known as flaky.
