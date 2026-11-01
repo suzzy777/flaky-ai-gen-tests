@@ -4,18 +4,23 @@ Numbers as they stand in the paper now (paper/sections/results.tex).
 
 ## Main study: filtering steps (paper/sections/setup.tex)
 
-**Focal methods and generated files** (flaky and non-flaky sources together):
+**Words used below:**
+- **Focal method:** the production method a test is generated for.
+- **File:** one generated test class. ChatUniTest writes one file for the focal method of each developer test.
+- **Test method:** one `@Test` method inside a file. A file usually has 1-5 of them.
 
-| Step | Count |
-|---|---|
-| Start | 300 (144 flaky tests from ReproFlake + 156 sampled focal methods of non-flaky tests) |
-| Focal method identified | 209 |
-| Builds | 194 |
-| ChatUniTest generates a file | 180 |
-| Generated file passes alone | 117 (223 test methods) |
-| iDFlakies can check | 96 |
-| Polluter | 3 |
-| State-setter | 2 |
+**Main study funnel** (flaky and non-flaky sources together):
+
+| Step | What is counted | Count |
+|---|---|---|
+| Start | developer tests we start from: 144 flaky (ReproFlake) + 156 non-flaky | 300 |
+| Focal method identified | developer tests with one focal method | 209 |
+| Project builds | developer tests with one focal method | 209 |
+| ChatUniTest generates a file | files | 192 |
+| File passes alone | files (test methods inside them) | 126 (240) |
+| iDFlakies can check the file | files | 96 |
+| Polluter | files (test methods that pollute) | 3 (10) |
+| State-setter | files (test methods that set the state) | 2 (3) |
 
 All 300 come from 80 project archives (44 projects). The non-flaky focal methods are sampled from the 13 modules where a file for a flaky test passes alone (up to 15 per module, fixed seed), so they add no new projects.
 
@@ -34,15 +39,16 @@ All 300 come from 80 project archives (44 projects). The non-flaky focal methods
 
 **Why tests drop out at each step:**
 1. **Focal method:** both techniques (Jaccard name similarity and the LLM) must pick the same single method. This removes tests of a whole component (e.g. wildfly's subsystem test), tests of a framework mechanism that call no production method directly (junit-quickcheck), and tests whose name points to no method (fastjson `Issue1480#test_for_issue`). 80 → 32 archives. NIO and TD tests drop most here.
-2. **Build:** 15 focal methods drop out because their module (one of the 13) doesn't build (209 → 194). graylog2-server builds once its JavaScript frontend build is skipped (the Java tests don't need it).
+2. **Build:** everything builds. hadoop (YARN-9405) needs protoc 2.5.0: our first non-flaky generation ran on a machine with a newer protoc, so its 15 hadoop focal methods were generated again on a machine with the right one (12 files). graylog2-server builds once its JavaScript frontend build is skipped (the Java tests don't need it).
 3. **Generation:** ChatUniTest keeps no test for 5 flaky tests. For graylog2-server, the time limit was raised from 30 minutes to 3 hours, because just parsing the project takes over an hour. When the focal method has overloads, only tests for the overload that the developer test calls are kept.
 4. **Pass alone:** the file must compile and pass alone; 13 archives have no such file. Example: the graylog test reads private fields by reflection, which graylog's own build check forbids in tests.
-5. **iDFlakies:** it can't run on 4 archives (mixed JUnit 4 and 5, its runner crashes, or a test JVM doesn't exit).
+5. **iDFlakies:** it can't run on 4 archives (mixed JUnit 4 and 5, its runner crashes, or a test JVM doesn't exit). One of them is hadoop: every iDFlakies round runs the whole YARN services suite with mini clusters and hit the 6 h limit with 0 of 20 rounds. So the hadoop files (1 flaky side, 9 non-flaky side) are checked with reruns, NonDex, NIO and the stress test, but not for order-dependence.
+6. **FlakeSync** (Hana): ran on every file that passes alone except hadoop, because FlakeSync's default blacklist excludes `org.apache.hadoop` from instrumentation. **Stress test** (Devanshi, stress-ng CPU/memory): ran on all files, hadoop included; 0 flaky.
 
 ## RQ1: How often are generated tests flaky?
-- **Flaky alone:** none. No generated test method is flaky when run alone (100 reruns, NonDex, NIO), in any experiment (main study: 0 of 223 methods).
+- **Flaky alone:** none. No generated test method is flaky when run alone (100 reruns, NonDex, NIO), in any experiment (main study: 0 of 240 methods).
 - **Polluters:** generated tests often break developer tests.
-  - Main study (ChatUniTest; 117 files pass alone, 96 of them checkable by iDFlakies): **3 of 96 files are polluters**, and **10 of the 223 test methods in the 117 files pollute** (each method run alone before a victim, twice). Together they break 35 developer tests.
+  - Main study (ChatUniTest; 126 files pass alone, 96 of them checkable by iDFlakies): **3 of 96 files are polluters**, and **10 of the 240 test methods in the 126 files pollute** (each method run alone before a victim, twice). Together they break 35 developer tests.
   - Across all experiments: **17 polluter files, from just 4 focal methods**; **54 of the 67 test methods in these files pollute** (in 12 files every method does). They break **over 500 developer tests**, 478 of them through one ormlite log setting. Most of these tests weren't known as flaky.
 - **State-setters:** 21 files, all harmless (main study: 2 files, 3 methods). They make one brittle developer test (`LoggerTest`) pass.
 
