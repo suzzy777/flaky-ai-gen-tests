@@ -17,7 +17,7 @@ ChatUniTest (gpt-4o) and an LLM agent generate unit tests for focal methods of r
 4. **A prompt that asks for cleanup removes it.** Current prompt: 4 of 8 files are polluters, breaking 507 developer tests. Cleanup prompt: 0 of 12 (Fisher p = 0.014).
 5. **Most of the broken developer tests are new.** Of the 507 broken by the current prompt, 418 are not in IDoFT's list of known flaky tests.
 6. **An agent that reads the existing tests first pollutes less, but copies their weaknesses.** Agent A (no reading): 6 of 13 files are polluters (dubbo ×4, marineapi ×2). Agent F (reads tests first): 3 of 11 (dubbo only, p = 0.42), and its 3 marineapi files become victims of an existing developer polluter, because F copied the setup of a test that's already a known victim.
-7. **Quality:** for the same focal method, the generated tests usually match the developer tests on coverage and mutation score. When they differ, the developer tests are more often better. Line coverage is 86% vs 94% (Wilcoxon p = 0.004). Generated tests on the flaky side are much weaker: line 66%, mutation 39%.
+7. **Quality:** for the same focal method, the generated tests usually match the developer tests on coverage and mutation score. When they differ, the developer tests are more often better. Line coverage is 86% vs 94% (Wilcoxon p = 0.003). Generated tests on the flaky side are much weaker: line 63%, mutation 39%.
 
 ## The reflection issue, in short
 
@@ -244,32 +244,34 @@ Fisher, 4/8 vs 0/12: **p = 0.014**.
 - **PIT mutators:** STRONGER is PIT's standard set, a few mutants per method. ALL is every operator PIT has, more mutants, so a steadier score.
 
 **Conclusion:**
-1. **Usually equal:** in 58 of 72 focal methods, the generated class covers the same share of the focal method's lines as the developer class. Mutation score is equal in 42 of 67.
+1. **Usually equal:** in 57 of 74 focal methods, the generated class covers the same share of the focal method's lines as the developer class. Mutation score is equal in 39 of 67.
 2. **When they differ, the developer tests are usually better:**
-   - line coverage 86% vs 94% (Wilcoxon p = 0.004);
-   - mutation score 76% vs 82% (p = 0.09, not significant), so there's no clear mutation difference overall.
-3. **The flaky side is weakest:** generated tests for focal methods of flaky tests reach 66% line coverage and 39% mutation score, against 90% and 79% on the non-flaky side (p < 0.001). The polluting files are in the weak group, so pollution doesn't come with better tests.
+   - line coverage 86% vs 94% (Wilcoxon p = 0.003);
+   - mutation score 74% vs 82% (p = 0.049, just significant), so the developer tests are only slightly better.
+3. **The flaky side is weakest:** generated tests for focal methods of flaky tests reach 63% line coverage and 39% mutation score, against 90% and 79% on the non-flaky side (p < 0.001). The polluters aren't simply weak tests: the two dubbo polluters kill 67% and 70% of the focal method's mutants; the marine-api polluter (only checks that an empty parser map makes create() throw) kills none.
 4. **Context helps quality:** on the 3 measured focal methods, agent F matched or beat the developer tests (marineapi 82% / 89% vs 64% / 67%), while ChatUniTest got 0% on marineapi. That's a case result: 5 focal methods, dubbo not measured yet.
 5. **Cleanup costs little:** coverage stays the same, except ormlite (100% → 67%).
 
-### 5.1 Main study: generated vs developer (JaCoCo + PIT; 184 of 189 items measured)
+### 5.1 Main study: generated vs developer (JaCoCo + PIT; all 117 generated files, 76 developer classes)
+
+Updated 2026-11-01: the 4 missing flaky-side files are now measured (dubbo rows 43, 55, 59 and hadoop row 141). PIT still fails on the dubbo developer classes (coverage only). The hadoop developer class is still running.
 
 | Tests | Files | Line | Branch | Mutation STRONGER | Mutation ALL |
 |---|---|---|---|---|---|
-| Generated, flaky side | 19 | 66% | 55% | 39% | 49% |
+| Generated, flaky side | 23 | 63% | 48% | 39% | 49% |
 | Generated, non-flaky side | 94 | 90% | 81% | 79% | 82% |
-| Developer (class of the source test) | 74 | 94% | 87% | 82% | 87% |
+| Developer (class of the source test) | 76 | 94% | 87% | 82% | 86% |
 
 **Paired: the same focal method (generated mean vs developer class)**
 
 | Metric | Pairs | Generated | Developer | Generated higher / same / developer higher | Wilcoxon p |
 |---|---|---|---|---|---|
-| Line | 72 | 86% | 94% | 3 / 58 / 11 | **0.004** |
-| Branch | 36 | 81% | 87% | 4 / 26 / 6 | 0.17 |
-| Mutation STRONGER | 67 | 76% | 82% | 11 / 42 / 14 | 0.09 |
-| Mutation ALL | 69 | 79% | 87% | 13 / 40 / 16 | 0.05 |
+| Line | 74 | 86% | 94% | 4 / 57 / 13 | **0.003** |
+| Branch | 37 | 82% | 88% | 4 / 25 / 8 | 0.13 |
+| Mutation STRONGER | 67 | 74% | 82% | 12 / 39 / 16 | **0.049** |
+| Mutation ALL | 70 | 78% | 86% | 15 / 37 / 18 | **0.049** |
 
-Generated tests are weaker on the flaky side than on the non-flaky side: line p = 0.002, mutation p < 0.001 (Mann-Whitney).
+Generated tests are weaker on the flaky side than on the non-flaky side: line p < 0.001, mutation p < 0.001 (Mann-Whitney).
 
 ### 5.2 The 5 focal methods (prompt and agent experiments)
 
