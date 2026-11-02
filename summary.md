@@ -1,4 +1,4 @@
-# Results per RQ, in short (2026-11-01)
+# Results per RQ, in short (2026-11-02)
 
 Numbers as they stand in the paper now (paper/sections/results.tex).
 
@@ -156,6 +156,35 @@ No file is flaky alone anywhere (reruns, NonDex and NIO everywhere; stress on th
 - **Cost per run:**
   - ChatUniTest ≤ $0.10; agent $0.26–0.47.
   - The cleanup sentence almost doubles the agent's cost ($0.26 → $0.46).
+
+## What's new vs. prior work (paper/sections/related.tex, intro.tex)
+- **Gruber et al. (ICSE'24, EvoSuite + Pynguin):**
+  - They ran each suite 100× in the same order and 100× in random orders; most generated flaky tests were OD (84% for EvoSuite).
+  - But they ran generated and developer tests **separately** "to avoid side-effects".
+  - So they never checked whether generated tests break developer tests.
+- **EvoSuite (FSE'11; static reset in ASE'14):**
+  - By default it resets static fields after each test: the scaffolding `@After` re-runs the class's static initializer.
+  - Gruber et al. found its suppression removes 71.7% of flaky tests.
+  - LLM tools have no such mechanism.
+- **Berndt et al. (ICSE-SEIP'26, DBMS):**
+  - They ran LLM tests 30×, in isolation or in a fixed order; most flaky tests were unordered-collection.
+  - Their "transfer" experiment: the LLM copies a planted 50%-random assertion from the prompt.
+  - We show real copying: the agent copies the setup of existing tests and becomes a victim.
+- **Meta TestGen-LLM:** reruns tests 5× to filter flaky ones.
+- **Azanza et al.:** experts judge test isolation by reading the tests, not by running them.
+- **Other LLM test-generation studies and agent work** (TestPilot, ChatTester, Yang ASE'24, Test Wars, ULT, SWT-Bench, TestForge, …) measure compile, pass, coverage, mutation or issue reproduction, never effects on the existing tests.
+- **Novelty claim:** first study of whether LLM-generated tests make the developer's existing tests flaky, and of how context and instructions affect this.
+
+## Recommendations (paper/sections/conclusion.tex)
+- **Developers:**
+  - Ask the generator to restore shared state.
+  - Let the agent read the existing tests: its victims are caused by existing polluters, which are worth fixing anyway.
+  - Always run generated tests together with the suite before adding them.
+- **Tool builders:**
+  - Don't trust the LLM to restore state; prompts reduce pollution but don't remove it.
+  - Combine the LLM with deterministic tools: compare state before and after the test (PolDet), restore it (as EvoSuite does), and run the test with the suite.
+  - Offer these as agent tools and as a final check.
+  - Not evaluated by us: future work.
 
 ## One-line takeaway
 Generated tests aren't flaky by themselves, but they break developer tests by changing shared state and not restoring it. One cleanup sentence mostly fixes that, but it makes generation harder and more expensive.
