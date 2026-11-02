@@ -67,33 +67,42 @@ Each condition adds text to the one before it. The exact text that is added (for
 | Protects against | the generated test being a **polluter**: it changes shared state and leaves it changed, so *later* tests fail | the generated test being a **victim**: it fails because an *earlier* test left shared state changed |
 | What it asks (our short summary, not the prompt's words) | Clean up after yourself: if you change a static field, a singleton (e.g. from `getInstance()`), a system property or a field set by reflection, save the old value in `@Before` and put it back in `@After` | Don't trust what others left behind: don't assume shared state is in its default state; set up the state your test needs yourself in `@Before` |
 | Used in | Prompt cleanup, Agent FC, Agent FCV | Agent FCV only |
-| Did it work? | yes: polluters 4 of 8 -> 0 of 12 files (ChatUniTest), 3 -> 1 run (agent F -> FC) | no: the marine-api victims stay (FCV 2 of 2 usable files) |
+| Did it work? | yes: polluters 4 of 20 -> 0 of 21 files (ChatUniTest), 3 -> 1 run of 30 (agent F -> FC) | no: the marine-api victims stay (FCV 2 of 2 usable files) |
 
 Exact wording in the prompt (the whole sentence that is added, nothing else):
 - **Cleanup:** "The tests may run in any order together with the project's other tests in the same JVM, so they must not change state that other tests see: if a test changes a static field, a singleton (e.g. an object returned by getInstance()), a system property, or any field set by reflection, save the original value before changing it (in @Before) and restore it in an @After method."
 - **Victim:** "Each test must pass no matter which tests ran before it: do not assume that shared state (static fields, singletons, system properties) is in its default state; set up the state your test needs in @Before."
 
-The prompt and agent experiments use 10 focal methods, 3 runs each: rows 1-15 (the 3 focal methods whose main-study tests are polluters + 2 that write fields by reflection) and rows 16-30 (5 more chosen where flakiness is likely).
+The prompt and agent experiments use **10 focal methods from the main study, 3 runs each (30 runs per condition)**: all 8 where flakiness is likely (the main-study test is a polluter or state-setter, or writes static/singleton state; there were no more) + 2 comparison cases whose tests use reflection only on their own objects.
+
+| Project | Focal method | Why chosen (main-study generated test) |
+|---|---|---|
+| dubbo (aa9f16e) | `ChangeTelnetHandler#telnet` | likely: polluter |
+| dubbo (628ad77) | `PortTelnetHandler#telnet` | likely: polluter |
+| marine-api | `AISMessageFactory#create` | likely: polluter |
+| ormlite-core | `LoggerFactory#setLogBackendType` | likely: state-setter |
+| ormlite-core | `SchemaUtils#createSchema` | likely: state-setter |
+| elastic-job | `JobRegistry#shutdown` | likely: replaces the singleton's maps by reflection |
+| elastic-job | `JobRegistry#getCurrentShardingTotalCount` | likely: sets static `instance` to null |
+| elastic-job | `InstanceNode#isLocalInstancePath` | likely: writes the singleton's `jobInstanceMap` |
+| scimono | `GroupRequest#createGroup` | comparison (picked by hand) |
+| marine-api | `AISMessage09Parser#isAccurate` | comparison (drawn at random, seed 2026, from 9 such tests) |
 
 **Results per experiment** (files; P = polluter, S = state-setter, V = victim):
 
 | Experiment | Generated | Pass alone | OD-checked | P | S | V | Developer tests broken (not in IDoFT) |
 |---|---|---|---|---|---|---|---|
-| Main study (flaky + non-flaky sources) | 192 | 126 | 96 | **3** | 2 | 0 | 35 (12) |
-| Rows 1-15, ChatUniTest default | 13 | 8 | 8 | **4** | 2 | 0 | 507 (418) |
-| Rows 1-15, ChatUniTest cleanup | 15 | 12 | 12 | 0 | 1 | 0 | 0 |
-| Rows 1-15, Agent A | 15 | 13 | 13 | **6** | 3 | 0 | 41 (14) |
-| Rows 1-15, Agent F | 14 | 11 | 11 | **3** | 3 | 3 | 27 (12) |
-| Rows 1-15, Agent FC | 15 | 12 | 12 | **1** | 3 | 2 | 14 |
-| Rows 1-15, Agent FCV | 15 | 9 | 9 | 0 | 3 | 2 | 0 |
-| Rows 16-30, ChatUniTest default | 14 | 12 | 12 | 0 | 1 | 0 | 0 |
-| Rows 16-30, ChatUniTest cleanup | 15 | 9 | 9 | 0 | 1 | 0 | 0 |
-| Rows 16-30, Agent A | 14 | 12 | 12 | 0 | 2 | 0 | 0 |
-| Rows 16-30, Agent F | 15 | 12 | 12 | 0 | 0 | 0 | 0 |
-| Rows 16-30, Agent FC | 15 | 10 | 10 | 0 | 0 | 0 | 0 |
-| Rows 16-30, Agent FCV | 15 | 12 | 12 | 0 | 0 | 0 | 0 |
+| Main study | 192 | 126 | 96 | **3** | 2 | 0 | 35 (12) |
+| 10 focal methods, ChatUniTest default | 27 | 20 | 20 | **4** | 3 | 0 | 507 (418) |
+| 10 focal methods, ChatUniTest cleanup | 30 | 21 | 21 | 0 | 2 | 0 | 0 |
+| 10 focal methods, Agent A | 29 | 25 | 25 | **6** | 5 | 0 | 41 (14) |
+| 10 focal methods, Agent F | 29 | 23 | 23 | **3** | 3 | 3 | 27 (12) |
+| 10 focal methods, Agent FC | 30 | 22 | 22 | **1** | 3 | 2 | 14 |
+| 10 focal methods, Agent FCV | 30 | 21 | 21 | 0 | 3 | 2 | 0 |
 
-No file is flaky alone in any row (reruns, NonDex and NIO everywhere; stress on the main study and rows 1-15; FlakeSync everywhere except hadoop). P, S and V add up to the totals in RQ1: 17 polluters, 21 state-setters, 7 victims.
+All polluters and victims come from the dubbo, marine-api `AISMessageFactory#create` and ormlite `LoggerFactory` focal methods.
+
+No file is flaky alone anywhere (reruns, NonDex and NIO everywhere; stress on the main study and 5 of the 10 focal methods: both dubbo, `AISMessageFactory#create`, `LoggerFactory`, scimono; FlakeSync everywhere except hadoop). P, S and V add up to the totals in RQ1: 17 polluters, 21 state-setters, 7 victims.
 
 ## RQ1: How often are generated tests flaky?
 - **All flakiness checks, one per type:**
@@ -104,13 +113,14 @@ No file is flaky alone in any row (reruns, NonDex and NIO everywhere; stress on 
   | NonDex | implementation-dependent (ID) | shuffle unordered Java APIs (100 seeds) | all methods that pass alone | 0 flaky |
   | NIO | non-idempotent (NIO) | run each method twice in one JVM, 100 times | all methods that pass alone | 0 flaky |
   | FlakeSync | timing / concurrency (TD) | find methods that run concurrently, then delay them (100 ms up to 12.8 s) | 510 methods (all experiments, no hadoop) | 0 flaky (concurrency found in only 1 method, a dubbo agent test; no delay makes it fail) |
-  | Stress (stress-ng) | resource-dependent | each method alone 10x under full CPU load and 10x under memory pressure | 421 methods (main study + rows 1-15) | 0 flaky |
-  | iDFlakies + confirmation | order-dependent (OD) | 20 random orders of the whole module test suite with the generated file, then confirm each case in a fixed order | 228 files (main study 96, rows 1-15: 65, rows 16-30: 67) | **17 polluter files, 21 state-setter files, 7 victim files** (iDFlakies finds 4 of the 7 victims; all 7 by direct check after the known developer polluter) |
+  | Stress (stress-ng) | resource-dependent | each method alone 10x under full CPU load and 10x under memory pressure | 421 methods (main study + 5 of the 10 focal methods) | 0 flaky |
+  | iDFlakies + confirmation | order-dependent (OD) | 20 random orders of the whole module test suite with the generated file, then confirm each case in a fixed order | 228 files (main study 96, the 10 focal methods 132) | **17 polluter files, 21 state-setter files, 7 victim files** (iDFlakies finds 4 of the 7 victims; all 7 by direct check after the known developer polluter) |
 
 - **Flaky alone:** so no generated test method is flaky by itself (main study: 0 of 240 methods). All the flakiness is order-dependence.
 - **Polluters:** generated tests often break developer tests.
   - Main study (ChatUniTest; 126 files pass alone, 96 of them checkable by iDFlakies): **3 of 96 files are polluters**, and **10 of the 240 test methods in the 126 files pollute** (each method run alone before a victim, twice). Together they break 35 developer tests.
   - Across all experiments: **17 polluter files, from just 4 focal methods**; **54 of the 67 test methods in these files pollute** (in 12 files every method does). They break **over 500 developer tests**, 478 of them through one ormlite log setting. Most of these tests weren't known as flaky.
+- **Victims:** 7 generated files fail after a developer test: all for marine-api `AISMessageFactory#create`, all from agents that read the existing tests (F 3, FC 2, FCV 2; 0 everywhere else, main study included). They fail after the developer polluter `SentenceFactoryTest#testRegisterParserWithAlternativeBeginChar`. iDFlakies finds only 4 of them; we find all 7 by running each generated file right after that developer polluter.
 - **State-setters:** 21 files, all harmless (main study: 2 files, 3 methods). They make one brittle developer test (`LoggerTest`) pass.
 
 ## RQ2: Why does it happen?
@@ -122,12 +132,12 @@ No file is flaky alone in any row (reruns, NonDex and NIO everywhere; stress on 
 - **Generated victims:** these come from the agent copying the setup of a developer test that is already order-dependent (marine-api `SentenceFactory`).
 
 ## RQ3: Does reading the existing tests help?
-- **Fewer polluters:** 6 runs (A) → 3 (F) of 15, though not significant (p = 0.42).
+- **Fewer polluters:** 6 runs (A) → 3 (F) of 30, though not significant (6 of 25 vs 3 of 23 files, p = 0.47).
 - **More cleanup:** 36% of F's files have an `@After` with code, vs 0% of A's.
 - **But it copies weaknesses:** every usable marine-api test from an agent that read the tests is a victim (F 3/3, FC 2/2, FCV 2/2; A 0/2). So reading the tests turns polluters into victims.
 
 ## RQ4: Do prompt instructions help?
-- **Cleanup sentence, ChatUniTest:** polluters drop from **4 of 8 → 0 of 12** files (p = 0.014).
+- **Cleanup sentence, ChatUniTest:** polluters drop from **4 of 20 → 0 of 21** files (p = 0.048).
 - **Cleanup sentence, agent:** polluters drop from 3 runs (F) → 1 (FC).
 - **Victim sentence (FCV):** no effect.
   - FCV's 0 polluters comes from the cleanup sentence plus unusable runs, not from the victim sentence.
@@ -139,9 +149,10 @@ No file is flaky alone in any row (reruns, NonDex and NIO everywhere; stress on 
 
 ## RQ5: Quality and cost
 - **Quality:** generated tests are close to developer tests for the same focal method.
-  - Line coverage 85% vs 93% (p = 0.002); mutation 74% vs 82% (p = 0.049, borderline).
+  - Paired by focal method (83 pairs, hadoop included): line coverage 83% vs 92% (p = 0.002, developer tests better); mutation 73% vs 80% (p = 0.08, not significant).
+  - All files: generated 126 files, line 84%, mutation 70%; developer 85 classes, line 92%, mutation 80%.
   - Most pairs are identical.
-- **Agents that read the tests write the strongest tests:** mutation F 90%, FCV 88%, vs ChatUniTest 59–68% (rows 1–15).
+- **Agents that read the tests write the strongest tests** (10 focal methods, mean mutation score of the focal method): F 88%, FC 83%, FCV 92%, vs A 77%, ChatUniTest 62–77%, developer 72%.
 - **Cost per run:**
   - ChatUniTest ≤ $0.10; agent $0.26–0.47.
   - The cleanup sentence almost doubles the agent's cost ($0.26 → $0.46).
